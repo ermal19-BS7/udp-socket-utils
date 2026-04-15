@@ -15,3 +15,24 @@ string sendCommand(SOCKET sock, sockaddr_in& server, string cmd)
         (sockaddr*)&server, &len);
 
     return string(buf, bytes);
+
+    string user, pass;
+cout << "Username: ";
+cin >> user;
+cout << "Password: ";
+cin >> pass;
+cin.ignore();
+
+string loginCmd = "/login " + user + " " + pass;
+cout << sendCommand(sock, server, loginCmd) << endl;
+
+while (true)
+{
+    cout << "/list /read /search /info /delete\n> ";
+    string input;
+    getline(cin, input);
+
+    if (input == "exit") break;
+
+    cout << sendCommand(sock, server, input) << endl;
+}
