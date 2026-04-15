@@ -1,6 +1,8 @@
 #include <iostream>
 #include <WS2tcpip.h>
+#include <sstream>
 #pragma comment(lib, "ws2_32.lib")
+
 using namespace std;
 
 int SERVER_PORT = 54000;
@@ -23,6 +25,10 @@ int main()
     int clientLength = sizeof(client);
     char buf[4096];
 
+    stringstream ss;
+ss << "{ \"clients\": " << clients.size() << " }";
+string response = ss.str();
+
     while (true)
     {
         int bytesIn = recvfrom(in, buf, sizeof(buf), 0,
@@ -35,4 +41,6 @@ int main()
         sendto(in, buf, bytesIn, 0,
             (sockaddr*)&client, clientLength);
     }
+
 }
+
