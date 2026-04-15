@@ -1,11 +1,25 @@
 #include <iostream>
 #include <WS2tcpip.h>
 #include <sstream>
+#include <thread>
+#include <chrono>
+#include <unordered_map>
+
 #pragma comment(lib, "ws2_32.lib")
 
 using namespace std;
 
 int SERVER_PORT = 54000;
+
+unordered_map<string, chrono::steady_clock::time_point> lastSeen;
+
+void cleanupClients()
+{
+    while (true)
+    {
+        this_thread::sleep_for(chrono::seconds(5));
+    }
+}
 
 int main()
 {
