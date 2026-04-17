@@ -4,6 +4,8 @@
 #include <thread>
 #include <chrono>
 #include <unordered_map>
+#include <filesystem>
+#include <fstream>
 
 #pragma comment(lib, "ws2_32.lib")
 
@@ -49,6 +51,22 @@ string response = ss.str();
             (sockaddr*)&client, &clientLength);
 
         if (bytesIn == SOCKET_ERROR) continue;
+
+        string cmd(buf, bytesIn);
+        namespace fs = std::filesystem;
+
+        if (cmd == "/list")
+        {
+            for (auto& f : fs::directory_iterator("."))
+                response += f.path().filename().string() + "\n";
+        }
+        else if (cmd.rfind("/read ", 0) == 0)
+        {
+            ifstream f(cmd.substr(6));
+            string line;
+            while (getline(f, line))
+                response += line + "\n";
+        }
 
         cout << "Received: " << string(buf, bytesIn) << endl;
 
