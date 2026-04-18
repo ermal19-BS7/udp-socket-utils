@@ -67,6 +67,27 @@ string response = ss.str();
             while (getline(f, line))
                 response += line + "\n";
         }
+        else if (cmd.rfind("/search ", 0) == 0)
+        {
+            string keyword = cmd.substr(8);
+            for (auto& f : fs::directory_iterator("."))
+            {
+                string name = f.path().filename().string();
+                if (name.find(keyword) != string::npos)
+                    response += name + "\n";
+            }
+        }
+        else if (cmd.rfind("/delete ", 0) == 0)
+        {
+           
+            if (clients[key] != "admin")
+                response = "Permission denied";
+            else
+            {
+                fs::remove(cmd.substr(8));
+                response = "Deleted";
+            }
+        }
 
         cout << "Received: " << string(buf, bytesIn) << endl;
 
