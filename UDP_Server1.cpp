@@ -144,3 +144,167 @@ int main()
     sockaddr_in client{};
     int clientLength = sizeof(client);
     char buf[8192];
+  while (true)
+    {
+        ZeroMemory(&client, clientLength);
+        ZeroMemory(buf, sizeof(buf));
+
+        int bytesIn = recvfrom(in, buf, sizeof(buf), 0, (sockaddr*)&client, &clientLength);
+        if (bytesIn == SOCKET_ERROR) continue;
+
+        string cmd(buf);
+        string key = getClientKey(client);
+        string response;
+
+        logMsg("[CMD] " + key + " -> " + cmd);
+
+        {
+            lock_guard<mutex> lock(mtx);
+
+            if (clients.size() >= MAX_CLIENTS && clients.find(key) == clients.end())
+            {
+                response = "Server full";
+                sendto(in, response.c_str(), response.size() + 1, 0, (sockaddr*)&client, clientLength);
+                logMsg("[REJECTED] Server full: " + key);
+                continue;
+            }
+
+            lastSeen[key] = chrono::steady_clock::now();
+            messageLog.push_back(cmd);
+        }
+
+        // LOGIN
+        if (cmd.rfind("/login ", 0) == 0)
+        {
+            istringstream iss(cmd);
+            string tmp, user, pass;
+            iss >> tmp >> user >> pass;
+
+            lock_guard<mutex> lock(mtx);
+
+            if (user == "admin" && pass == "1234")
+            {
+                clients[key] = "admin";
+                response = "Logged in as ADMIN";
+
+                logMsg("[LOGIN] " + key + " -> ADMIN");
+            }
+            else if (user == "user" && pass == "1111")
+            {
+                clients[key] = "user";
+                response = "Logged in as USER";
+
+                logMsg("[LOGIN] " + key + " -> USER");
+            }
+            else
+            {
+                response = "Login failed";
+                logMsg("[LOGIN FAILED] " + key);
+            }
+        }
+        else
+        {
+            lock_guard<mutex> lock(mtx);
+
+            if (clients.find(key) == clients.end())
+            {
+                response = "Please login first";
+                logMsg("[UNAUTH] " + key);
+            }
+            else
+            {
+                string role = clients[key];
+
+                if (role == "user")
+                    this_thread::sleep_for(chrono::milliseconds(200));
+
+                if (cmd == "/list")
+                {
+                    for (auto& f : fs::directory_iterator("."))
+                        response += f.path().filename().string() + "\n";
+                }
+                else if (cmd.rfind("/read ", 0) == 0)
+                {
+                    string fileName = cmd.substr(6);
+
+                    cout << "[READ] file requested: " << fileName << endl;
+
+                    ifstream f(fileName);
+
+                    if (!f.is_open())
+                    {
+                        response = "File not found";
+                        cout << "[READ] FAILED opening file" << endl;
+                    }
+                    else
+                    {
+                        string line;
+                        response.clear();
+
+                        while (getline(f, line))
+                        {
+                            response += line + "\n";
+                        }
+
+                        cout << "[READ] SUCCESS" << endl;
+                    }
+                }
+                else if (cmd.rfind("/upload ", 0) == 0)
+                {
+                    if (role != "admin") response = "Permission denied";
+                    else
+                    {
+                        size_t sep = cmd.find('|');
+                        string filename = cmd.substr(8, sep - 8);
+                        string content = cmd.substr(sep + 1);
+
+                        ofstream out(filename);
+                        out << content;
+                        response = "Uploaded";
+                    }
+                }
+                else if (cmd.rfind("/download ", 0) == 0)
+                {
+                    ifstream f(cmd.substr(10));
+                    if (!f) response = "File not found";
+                    else
+                    {
+                        stringstream ss;
+                        ss << f.rdbuf();
+                        response = ss.str();
+                    }
+                }
+                else if (cmd.rfind("/delete ", 0) == 0)
+                {
+                    if (role != "admin") response = "Permission denied";
+                    else
+                        response = fs::remove(cmd.substr(8)) ? "Deleted" : "Error";
+                }
+                else if (cmd.rfind("/search ", 0) == 0)
+                {
+                    string keyw = cmd.substr(8);
+                    for (auto& f : fs::directory_iterator("."))
+                        if (f.path().filename().string().find(keyw) != string::npos)
+                            response += f.path().filename().string() + "\n";
+                }
+                else if (cmd.rfind("/info ", 0) == 0)
+                {
+                    string file = cmd.substr(6);
+                    if (fs::exists(file))
+                        response = "Size: " + to_string(fs::file_size(file));
+                    else
+                        response = "File not found";
+                }
+                else
+                {
+                    response = "Unknown command";
+                }
+            }
+        }
+
+        logMsg("[RESPONSE] " + key + " -> " + response);
+
+        sendto(in, response.c_str(), response.size() + 1, 0,
+            (sockaddr*)&client, clientLength);
+    }
+}
