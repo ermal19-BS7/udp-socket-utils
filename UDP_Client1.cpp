@@ -1,7 +1,15 @@
 #include <iostream>
+#include <string>
 #include <WS2tcpip.h>
+#include <fstream>
+#include <sstream>
+
 #pragma comment(lib, "ws2_32.lib")
+
 using namespace std;
+
+string SERVER_IP = "127.0.0.1";
+int SERVER_PORT = 54000;
 
 string sendCommand(SOCKET sock, sockaddr_in& server, string cmd)
 {
@@ -9,30 +17,40 @@ string sendCommand(SOCKET sock, sockaddr_in& server, string cmd)
         (sockaddr*)&server, sizeof(server));
 
     char buf[8192];
-    int len = sizeof(server);
+    int serverLen = sizeof(server);
 
-    int bytes = recvfrom(sock, buf, 8192, 0,
-        (sockaddr*)&server, &len);
+    int bytesReceived = recvfrom(sock, buf, 8192, 0,
+        (sockaddr*)&server, &serverLen);
 
-    return string(buf, bytes);
+    if (bytesReceived == SOCKET_ERROR)
+        return "No response";
+
+    return string(buf);
+}
+
+int main()
+{
+    WSADATA data;
+    WSAStartup(MAKEWORD(2, 2), &data);
+
+    SOCKET sock = socket(AF_INET, SOCK_DGRAM, 0);
+
+    DWORD timeout = 3000;
+    setsockopt(sock, SOL_SOCKET, SO_RCVTIMEO, (char*)&timeout, sizeof(timeout));
+
+    sockaddr_in server{};
+    server.sin_family = AF_INET;
+    server.sin_port = htons(SERVER_PORT);
+    inet_pton(AF_INET, SERVER_IP.c_str(), &server.sin_addr);
 
     string user, pass;
-cout << "Username: ";
-cin >> user;
-cout << "Password: ";
-cin >> pass;
-cin.ignore();
+    cout << "Username: ";
+    cin >> user;
+    cout << "Password: ";
+    cin >> pass;
+    cin.ignore();
 
-string loginCmd = "/login " + user + " " + pass;
-cout << sendCommand(sock, server, loginCmd) << endl;
+    string res = sendCommand(sock, server, "/login " + user + " " + pass);
+    cout << res << endl;
 
-while (true)
-{
-    cout << "/list /read /search /info /delete\n> ";
-    string input;
-    getline(cin, input);
-
-    if (input == "exit") break;
-
-    cout << sendCommand(sock, server, input) << endl;
-}
+    bool isAdmin = (user == "admin");
