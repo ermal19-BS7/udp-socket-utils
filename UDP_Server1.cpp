@@ -6,6 +6,8 @@
 #include <unordered_map>
 #include <filesystem>
 #include <fstream>
+#include <unordered_map>
+#include <sstream>
 
 #pragma comment(lib, "ws2_32.lib")
 
@@ -14,6 +16,15 @@ using namespace std;
 int SERVER_PORT = 54000;
 
 unordered_map<string, chrono::steady_clock::time_point> lastSeen;
+unordered_map<string, string> clients;
+
+string getClientKey(sockaddr_in& client)
+{
+    char ip[INET_ADDRSTRLEN];
+    inet_ntop(AF_INET, &client.sin_addr, ip, INET_ADDRSTRLEN);
+    return string(ip) + ":" + to_string(ntohs(client.sin_port));
+}
+
 
 void cleanupClients()
 {
@@ -53,7 +64,24 @@ string response = ss.str();
         if (bytesIn == SOCKET_ERROR) continue;
 
         string cmd(buf, bytesIn);
+        string key = getClientKey(client);
+        string response;
         namespace fs = std::filesystem;
+
+        if (cmd.rfind("/login ", 0) == 0)
+        {
+            istringstream iss(cmd);
+            string tmp, user, pass;
+            iss >> tmp >> user >> pass;
+
+            if (user == "admin" && pass == "1234")
+            {
+                clients[key] = "admin";
+                response = "Logged in as ADMIN";
+            }
+            else
+                response = "Login failed";
+        }  
 
         if (cmd == "/list")
         {
