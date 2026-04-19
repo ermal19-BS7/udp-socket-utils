@@ -54,3 +54,53 @@ int main()
     cout << res << endl;
 
     bool isAdmin = (user == "admin");
+
+    while (true)
+    {
+        cout << "\n> ";
+        string input;
+        getline(cin, input);
+
+        if (input == "exit") break;
+
+        if (input.rfind("/upload ", 0) == 0 && isAdmin)
+        {
+            string filename = input.substr(8);
+            ifstream f(filename);
+
+            if (!f)
+            {
+                cout << "File not found\n";
+                continue;
+            }
+
+            stringstream ss;
+            ss << f.rdbuf();
+
+            string cmd = "/upload " + filename + "|" + ss.str();
+            cout << sendCommand(sock, server, cmd) << endl;
+        }
+        else if (input.rfind("/download ", 0) == 0)
+        {
+            string filename = input.substr(10);
+            string res = sendCommand(sock, server, input);
+
+            if (res == "File not found")
+            {
+                cout << res << endl;
+                continue;
+            }
+
+            ofstream out(filename);
+            out << res;
+            cout << "Downloaded\n";
+        }
+        else
+        {
+            cout << sendCommand(sock, server, input) << endl;
+        }
+    }
+
+    closesocket(sock);
+    WSACleanup();
+}
